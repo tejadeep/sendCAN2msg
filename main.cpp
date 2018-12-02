@@ -10,7 +10,6 @@
 #include "readIni.h"
 #include "sllist.h"
 #include "canfoncts.h"
-#include "n2kfoncts.h"
 
 using namespace std;
 
