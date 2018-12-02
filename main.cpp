@@ -19,6 +19,9 @@ MCP2515* myCAN=nullptr;
 sig_atomic_t volatile siguser1=0;
 sig_atomic_t volatile siguser2=0;
 
+sig_atomic_t volatile rx0BuffFull=0;
+sig_atomic_t volatile rx1BuffFull=0;
+
 bool DEBUG_CONFIG;
 bool DEBUG_RUN;
 bool DEBUG_INMSG;
@@ -84,7 +87,8 @@ int main(int argc, char *argv[])
 
     if(wiringPiSPISetup (CSPIN, MCP2515_fSPI))
     {
-        if(DEBUG_CONFIG) syslog(LOG_INFO,"SPI Init OK - Speed : %d MHz - CS pin : %d",MCP2515_fSPI/1000000, CSPIN);
+        if(DEBUG_CONFIG)
+            syslog(LOG_INFO,"SPI Init OK - Speed : %d MHz - CS pin : %d",MCP2515_fSPI/1000000, CSPIN);
     }
     else
     {
@@ -153,7 +157,6 @@ int main(int argc, char *argv[])
     {
         if(millis()-timer01>=200)
         {
-            /************************/
             /** Put your stuff here */
             erpm = 1876.75*4;   /** 1876.75 RPM     Engine Round Per 4 minutes (resolution 0.25 RPM) */
             ebp = 1.543*1000;   /** 1.54 B          Engine Boost presure in HPa*/
@@ -168,7 +171,6 @@ int main(int argc, char *argv[])
             ecrire0.data[6] = 255;                              /** Reserved */
             ecrire0.data[7] = 255;
             /** End of your stuff */
-            /**********************/
 
             digitalWrite(Led_Pin, HIGH); // Firing Trigger for SPI bus debugging purpose
 
@@ -190,8 +192,7 @@ int main(int argc, char *argv[])
             struct sllist* myidx = sllist_create(); /** Creating index of elements */
             struct maillon* mydata=nullptr;         /** Declaring an element structure */
 
-            /**
-             * Put your stuff here
+            /** Put your stuff here
              *
              * Remember ...
              * 1 Bar (B) = 1000 Hecto Pascal (HPa)
@@ -252,6 +253,66 @@ int main(int argc, char *argv[])
             timer02=millis();
             sllist_destroy(myidx);                                  /** Clearing index and elements */
             free(mydata);                                           /** Not sure but secure */
+        }
+
+        if(rx0BuffFull)
+        {
+            Frame lire0;
+            lire0 = myCAN->ReadBuffer(RXB0);
+            myCAN->BitModify(CANINTF, 0b00000001, 0);
+            rx0BuffFull=0;
+
+            /**
+             *  Put your stuff here
+             *  For example :
+             */
+            dispSingleMsg(0,&lire0);
+            /** End of your stuff **/
+
+            if(DEBUG_INMSG)
+            {
+                char tmpbuff[10];
+                char syslogMsg[200];
+                sprintf(syslogMsg, "RX0 full : filter %d Msg ID %lu DLC %u DATA ", lire0.filt,lire0.id, lire0.dlc);
+
+                for(int i=0; i<lire0.dlc; i++)
+                {
+                    sprintf(tmpbuff,"0x%x ",lire0.data[i]);
+                    strcat(syslogMsg, tmpbuff);
+                }
+
+                syslog(LOG_INFO,syslogMsg);
+            }
+        }
+
+        if(rx1BuffFull)
+        {
+            Frame lire1;
+            lire1 = myCAN->ReadBuffer(RXB1);
+            myCAN->BitModify(CANINTF, 0b00000010, 0);
+            rx1BuffFull=0;
+
+            /**
+             *  Put your stuff here
+             *  For example :
+             */
+            dispSingleMsg(1,&lire1);
+            /** End of your stuff **/
+
+            if(DEBUG_INMSG)
+            {
+                char tmpbuff[10];
+                char syslogMsg[200];
+                sprintf(syslogMsg, "RX1 full : filter %d Msg ID %lu DLC %u DATA ", lire1.filt,lire1.id, lire1.dlc);
+
+                for(int i=0; i<lire1.dlc; i++)
+                {
+                    sprintf(tmpbuff,"0x%x ",lire1.data[i]);
+                    strcat(syslogMsg, tmpbuff);
+                }
+
+                syslog(LOG_INFO,syslogMsg);
+            }
         }
     }
 

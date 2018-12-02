@@ -118,47 +118,11 @@ void MCP2515Int(void)
         break;
 
     case 6:
-        Frame lire0;
-        lire0 = myCAN->ReadBuffer(RXB0);
-        myCAN->BitModify(CANINTF, 0b00000001, 0);
-
-        if(DEBUG_INMSG)
-        {
-            char tmpbuff[10];
-            char syslogMsg[200];
-            sprintf(syslogMsg, "RX0 full : filter %d Msg ID %lu DLC %u DATA ", lire0.filt,lire0.id, lire0.dlc);
-
-            for(int i=0; i<lire0.dlc; i++)
-            {
-                sprintf(tmpbuff,"0x%x ",lire0.data[i]);
-                strcat(syslogMsg, tmpbuff);
-            }
-
-            syslog(LOG_INFO,syslogMsg);
-        }
-
+        rx0BuffFull=1;
         break;
 
     case 7:
-        Frame lire1;
-        lire1 = myCAN->ReadBuffer(RXB1);
-        myCAN->BitModify(CANINTF, 0b00000010, 0);
-
-        if(DEBUG_INMSG)
-        {
-            char tmpbuff[10];
-            char syslogMsg[200];
-            sprintf(syslogMsg, "RX1 full : filter %d Msg ID %lu DLC %u DATA ", lire1.filt,lire1.id, lire1.dlc);
-
-            for(int i=0; i<lire1.dlc; i++)
-            {
-                sprintf(tmpbuff,"0x%x ",lire1.data[i]);
-                strcat(syslogMsg, tmpbuff);
-            }
-
-            syslog(LOG_INFO,syslogMsg);
-        }
-
+        rx1BuffFull=1;
         break;
 
     default:
@@ -478,3 +442,20 @@ bool addByte(struct maillon* onedata, struct sllist* oneIdx, uint8_t oneByte)
     return true;
 }
 
+/**
+ *
+ * Display single message
+ *
+ */
+void dispSingleMsg(uint8_t rxBuff, Frame* oneMsg)
+{
+    printf("Received data in buffer %d\n\r",rxBuff);
+    printf("ID : %ld\n\r",oneMsg->id);
+    printf("DLC : %d\n\r",oneMsg->dlc);
+    printf("Data");
+    for(int i=0;i<oneMsg->dlc;i++)
+    {
+        printf(" : %d",oneMsg->data[i]);
+    }
+    printf("\n\rFilter : %d\n\r",oneMsg->filt);
+}
