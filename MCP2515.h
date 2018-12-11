@@ -28,6 +28,8 @@ extern bool DEBUG_OUTMSG;
 extern uint16_t MCP2515_LDELAY;
 extern uint8_t MCP2515_MRETRY;
 
+extern uint8_t caninte;
+
 class MCP2515
 {
 public:

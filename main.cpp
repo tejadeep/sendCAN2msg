@@ -21,6 +21,11 @@ sig_atomic_t volatile siguser2=0;
 sig_atomic_t volatile rx0BuffFull=0;
 sig_atomic_t volatile rx1BuffFull=0;
 
+Frame lire0;
+Frame lire1;
+Frame* plire0=&lire0;
+Frame* plire1=&lire1;
+
 bool DEBUG_CONFIG;
 bool DEBUG_RUN;
 bool DEBUG_INMSG;
@@ -31,6 +36,7 @@ int CSPIN;
 char readIniBuf[40];
 char iniFile[20];
 uint8_t startMM;
+uint8_t caninte;
 
 int main(int argc, char *argv[])
 {
@@ -256,10 +262,9 @@ int main(int argc, char *argv[])
 
         if(rx0BuffFull)
         {
-            Frame lire0;
-            lire0 = myCAN->ReadBuffer(RXB0);
-            myCAN->BitModify(CANINTF, 0b00000001, 0);
             rx0BuffFull=0;
+
+            if(DEBUG_INMSG) logRecvMsg(0, &lire0);
 
             /**
              *  Put your stuff here
@@ -267,29 +272,13 @@ int main(int argc, char *argv[])
              */
             dispSingleMsg(0,&lire0);
             /** End of your stuff **/
-
-            if(DEBUG_INMSG)
-            {
-                char tmpbuff[10];
-                char syslogMsg[200];
-                sprintf(syslogMsg, "RX0 full : filter %d Msg ID %lu DLC %u DATA ", lire0.filt,lire0.id, lire0.dlc);
-
-                for(int i=0; i<lire0.dlc; i++)
-                {
-                    sprintf(tmpbuff,"0x%x ",lire0.data[i]);
-                    strcat(syslogMsg, tmpbuff);
-                }
-
-                syslog(LOG_INFO,syslogMsg);
-            }
         }
 
         if(rx1BuffFull)
         {
-            Frame lire1;
-            lire1 = myCAN->ReadBuffer(RXB1);
-            myCAN->BitModify(CANINTF, 0b00000010, 0);
             rx1BuffFull=0;
+
+            if(DEBUG_INMSG) logRecvMsg(1, &lire1);
 
             /**
              *  Put your stuff here
@@ -297,21 +286,6 @@ int main(int argc, char *argv[])
              */
             dispSingleMsg(1,&lire1);
             /** End of your stuff **/
-
-            if(DEBUG_INMSG)
-            {
-                char tmpbuff[10];
-                char syslogMsg[200];
-                sprintf(syslogMsg, "RX1 full : filter %d Msg ID %lu DLC %u DATA ", lire1.filt,lire1.id, lire1.dlc);
-
-                for(int i=0; i<lire1.dlc; i++)
-                {
-                    sprintf(tmpbuff,"0x%x ",lire1.data[i]);
-                    strcat(syslogMsg, tmpbuff);
-                }
-
-                syslog(LOG_INFO,syslogMsg);
-            }
         }
     }
 
