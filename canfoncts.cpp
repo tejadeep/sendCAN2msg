@@ -39,95 +39,127 @@ void MCP2515Int(void)
 {
     uint8_t canintf = myCAN->Read(CANINTF);
 
-    printf("Interrupt CANINTF : 0x%x\n\r",canintf);
-
-    switch(canintf&0b11)
+    if((canintf&0b11)==3)
     {
-    case 3:
-        *plire0 = myCAN->ReadBuffer(RXB0);
-        *plire1 = myCAN->ReadBuffer(RXB1);
-        rx0BuffFull=1;
-        rx1BuffFull=1;
-        break;
-    case 2:
-        *plire1 = myCAN->ReadBuffer(RXB1);
-        rx1BuffFull=1;
-        break;
-    case 1:
         *plire0 = myCAN->ReadBuffer(RXB0);
         rx0BuffFull=1;
-        break;
+        *plire1 = myCAN->ReadBuffer(RXB1);
+        rx1BuffFull=1;
     }
 
-    uint8_t intstat = (myCAN->Read(CANINTF))&caninte;
-
-    if(intstat==0)
-        return;
-
-    if(intstat&0b10000000)
+    if(canintf&0b01)
     {
-        myCAN->BitModify(CANINTF, 0b10000000,0);
-        syslog(LOG_ERR,"Error during message reception or transmission");
+        *plire0 = myCAN->ReadBuffer(RXB0);
+        rx0BuffFull=1;
     }
 
-    if(intstat&0b01000000)
+    if(canintf&0b10)
     {
-        myCAN->BitModify(CANINTF, 0b01000000,0);
-        syslog(LOG_INFO,"Wake-up on CAN bus activity");
+        *plire1 = myCAN->ReadBuffer(RXB1);
+        rx1BuffFull=1;
     }
 
-    if(intstat&0b00100000)
+    if( (canintf & 0b11111100) & caninte )
     {
-        uint8_t eflg = myCAN->Read(EFLG);
+        uint8_t canstat = myCAN->Read(CANSTAT);
+        uint8_t icod = ( canstat & 0b00001110) >> 1;
+        uint8_t eflg;
+        uint8_t tec;
+        uint8_t rec;
 
-        if(eflg&0b10000000)
+        switch (icod)
         {
-            myCAN->BitModify(EFLG, 0b10000000,0);
-            syslog(LOG_ERR,"RX1 buffer overflow");
-        }
+        case 1:
+            eflg = myCAN->Read(EFLG);
+            syslog(LOG_WARNING,"Error. EFLG register : 0x%x",eflg);
 
-        if(eflg&0b01000000)
-        {
-            myCAN->BitModify(EFLG, 0b01000000,0);
-            syslog(LOG_ERR,"RX0 buffer overflow");
-        }
-
-        if(eflg&0b00111111)
-        {
-            uint8_t tec = myCAN->Read(TEC);
-            uint8_t rec = myCAN->Read(REC);
-
-            if(eflg&0b00100000)
+            if ( eflg & 0b10000000 )
             {
-                syslog(LOG_ERR,"Bus-Off Error. TEC or REC = 255 : TEC = %u REC = %u", tec, rec);
+                syslog(LOG_WARNING,"Receive Buffer 1 Overflow");
             }
 
-            if(eflg&0b00010000)
+            if ( eflg & 0b01000000 )
             {
-                syslog(LOG_WARNING,"Transmit Error-Passive. TEC >= 128 : %u",tec);
+                syslog(LOG_WARNING,"Receive Buffer 0 Overflow");
             }
 
-            if(eflg&0b00001000)
+            if( eflg & 0b00111111 )
             {
-                syslog(LOG_WARNING,"Receive Error-Passive. REC >= 128 : %u",rec);
-            }
+                tec = myCAN->Read(TEC);
+                rec = myCAN->Read(REC);
 
-            if(eflg&0b00000100)
+                if ( eflg & 0b00100000 )
+                {
+                    syslog(LOG_ERR,"Bus-Off Error. TEC or REC = 255 : TEC = %u REC = %u", tec, rec);
+                }
+
+                if ( eflg & 0b00010000 )
+                {
+                    syslog(LOG_WARNING,"Transmit Error-Passive. TEC >= 128 : %u",tec);
+                }
+
+                if ( eflg & 0b00001000 )
+                {
+                    syslog(LOG_WARNING,"Receive Error-Passive. REC >= 128 : %u",rec);
+                }
+
+                if ( eflg & 0b00000100 )
+                {
+                    syslog(LOG_WARNING,"Transmit Error-Warning. TEC >= 96 : %u",tec);
+                }
+
+                if ( eflg & 0b00000010 )
+                {
+                    syslog(LOG_WARNING,"Receive Error-Warning. REC >= 96 : %u",rec);
+                }
+
+                if ( eflg & 0b00000001 )
+                {
+                    syslog(LOG_WARNING,"Error-Warning. TEC or REC >= 96. TEC = %u - REC = %u",tec, rec);
+                }
+            }
+            break;
+
+        case 2:
+            if(DEBUG_RUN)
             {
-                syslog(LOG_WARNING,"Transmit Error-Warning. TEC >= 96 : %u",tec);
+                syslog(LOG_INFO,"Wake-up");
             }
+            break;
 
-            if(eflg&0b00000010)
+        case 3:
+            if(DEBUG_RUN)
             {
-                syslog(LOG_WARNING,"Receive Error-Warning. REC >= 96 : %u",rec);
+                syslog(LOG_INFO,"Transmit Buffer 0 Empty : message sent");
             }
+            break;
 
-            if(eflg&0b00000001)
+        case 4:
+            if(DEBUG_RUN)
             {
-                syslog(LOG_WARNING,"Error-Warning. TEC or REC >= 96. TEC = %u - REC = %u",tec, rec);
+                syslog(LOG_INFO,"Transmit Buffer 1 Empty : message sent");
             }
+            break;
 
-            myCAN->BitModify(EFLG, 0b00111111,0);
+        case 5:
+            if(DEBUG_RUN)
+            {
+                syslog(LOG_INFO,"Transmit Buffer 2 Empty : message sent");
+            }
+            break;
+
+        /*case 6:
+            rx0BuffFull=1;
+            *plire0 = myCAN->ReadBuffer(RXB0);
+            break;
+
+        case 7:
+            rx1BuffFull=1;
+            *plire1 = myCAN->ReadBuffer(RXB1);
+            break;*/
+
+        default:
+            syslog(LOG_ERR,"Unknown Error code CANSTAT.ICOD %u", icod);
         }
     }
 }
@@ -137,29 +169,19 @@ void MCP2515Int(void)
  * Load message into free buffer and request to send it
  *
  */
-bool sendMsg(MCP2515* objCAN, Frame* msg)
+bool sendMsg(MCP2515* objCAN, Frame* oneMsg)
 {
 
-    if(objCAN->Read(CANINTF) & TX0IF)
+    if((objCAN->Read(CANINTF) & TX0IF)>>2)
     {
-        if(objCAN->LoadBuffer(TXB0, *msg))
+        if(objCAN->LoadBuffer(TXB0, *oneMsg))
         {
+            objCAN->BitModify(CANINTF, TX0IF, 0);
+
             if(objCAN->SendBuffer(TXB0))
             {
                 if(DEBUG_OUTMSG)
-                {
-                    char tmpbuff[10];
-                    char syslogMsg[200];
-                    sprintf(syslogMsg, "TX0 Buffer send Msg ID %lu DLC %u DATA ", msg->id, msg->dlc);
-
-                    for(int i=0; i<msg->dlc; i++)
-                    {
-                        sprintf(tmpbuff,"0x%x ",msg->data[i]);
-                        strcat(syslogMsg, tmpbuff);
-                    }
-
-                    syslog(LOG_INFO,syslogMsg);
-                }
+                    logSentMsg(0, oneMsg);
 
                 return true;
             }
@@ -168,6 +190,7 @@ bool sendMsg(MCP2515* objCAN, Frame* msg)
                 syslog(LOG_ERR,"Unable to send buffer TX0");
                 return false;
             }
+
         }
         else
         {
@@ -175,27 +198,17 @@ bool sendMsg(MCP2515* objCAN, Frame* msg)
             return false;
         }
     }
-    else if(objCAN->Read(CANINTF) & TX1IF)
+    else if((objCAN->Read(CANINTF) & TX1IF)>>3)
     {
-        if(objCAN->LoadBuffer(TXB1, *msg))
+        if(objCAN->LoadBuffer(TXB1, *oneMsg))
         {
+            objCAN->BitModify(CANINTF, TX1IF, 0);
+
             if(objCAN->SendBuffer(TXB1))
             {
                 if(DEBUG_OUTMSG)
-                {
-                    char tmpbuff[10];
-                    char syslogMsg[200];
-                    sprintf(syslogMsg, "TX1 Buffer send Msg ID %lu DLC %u DATA ", msg->id, msg->dlc);
+                    logSentMsg(1, oneMsg);
 
-                    for(int i=0; i<msg->dlc; i++)
-                    {
-                        sprintf(tmpbuff,"0x%x ",msg->data[i]);
-                        strcat(syslogMsg, tmpbuff);
-                    }
-
-                    syslog(LOG_INFO,syslogMsg);
-
-                }
                 return true;
             }
             else
@@ -210,26 +223,17 @@ bool sendMsg(MCP2515* objCAN, Frame* msg)
             return false;
         }
     }
-    else if(objCAN->Read(CANINTF) & TX2IF)
+    else if((objCAN->Read(CANINTF) & TX2IF)>>4)
     {
-        if(objCAN->LoadBuffer(TXB2, *msg))
+        if(objCAN->LoadBuffer(TXB2, *oneMsg))
         {
+            objCAN->BitModify(CANINTF, TX2IF, 0);
+
             if(objCAN->SendBuffer(TXB2))
             {
                 if(DEBUG_OUTMSG)
-                {
-                    char tmpbuff[10];
-                    char syslogMsg[200];
-                    sprintf(syslogMsg, "TX2 Buffer send Msg ID %lu DLC %u DATA ", msg->id, msg->dlc);
+                    logSentMsg(2, oneMsg);
 
-                    for(int i=0; i<msg->dlc; i++)
-                    {
-                        sprintf(tmpbuff,"0x%x ",msg->data[i]);
-                        strcat(syslogMsg, tmpbuff);
-                    }
-
-                    syslog(LOG_INFO,syslogMsg);
-                }
                 return true;
             }
             else
@@ -246,7 +250,8 @@ bool sendMsg(MCP2515* objCAN, Frame* msg)
     }
     else
     {
-        return false;   /** All TXn buffers full **/
+        syslog(LOG_ERR, "All TXn Buffers Full");
+        return false;
     }
 
     syslog(LOG_ERR,"Unable to send message. Unkown error ...");
@@ -443,16 +448,26 @@ void dispSingleMsg(uint8_t rxBuff, Frame* oneMsg)
     printf(" Filter %d\n\r",oneMsg->filt);
 }
 
-/**
- *
- * Log received message
- *
- */
 void logRecvMsg(uint8_t rxBuff, Frame* oneMsg)
 {
     char tmpbuff[10];
     char syslogMsg[200];
-    sprintf(syslogMsg, "RX%u : filter %u Msg ID %lu DLC %u DATA ", rxBuff, oneMsg->filt,oneMsg->id, oneMsg->dlc);
+    sprintf(syslogMsg, "RX%u full : filter %u Msg ID %lu DLC %u DATA ",rxBuff, oneMsg->filt,oneMsg->id, oneMsg->dlc);
+
+    for(int i=0; i<oneMsg->dlc; i++)
+    {
+        sprintf(tmpbuff,"0x%x ",oneMsg->data[i]);
+        strcat(syslogMsg, tmpbuff);
+    }
+
+    syslog(LOG_INFO,syslogMsg);
+}
+
+void logSentMsg(uint8_t txBuff, Frame* oneMsg)
+{
+    char tmpbuff[10];
+    char syslogMsg[200];
+    sprintf(syslogMsg, "TX%u Buffer send Msg ID %lu DLC %u DATA ", txBuff, oneMsg->id, oneMsg->dlc);
 
     for(int i=0; i<oneMsg->dlc; i++)
     {

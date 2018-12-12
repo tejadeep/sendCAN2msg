@@ -27,16 +27,15 @@ extern sig_atomic_t volatile siguser2;
 extern sig_atomic_t volatile rx0BuffFull;
 extern sig_atomic_t volatile rx1BuffFull;
 
+extern uint8_t startMM;
+extern uint8_t caninte;
+
 extern Frame* plire0;
 extern Frame* plire1;
-extern Frame lire0;
-extern Frame lire1;
-
-extern uint8_t startMM;
 
 extern MCP2515* myCAN;
 
-bool sendMsg(MCP2515* objCAN, Frame* msg);
+bool sendMsg(MCP2515* objCAN, Frame* oneMsg);
 
 bool sendSingleMsg(MCP2515* objCAN, Frame* oneMsg);
 
@@ -45,6 +44,8 @@ bool sendMultiMsg(MCP2515* objCAN, struct sllist* oneIdx, uint8_t oneSize, Frame
 void dispSingleMsg(uint8_t rxBuff, Frame* oneMsg);
 
 void logRecvMsg(uint8_t rxBuff, Frame* oneMsg);
+
+void logSentMsg(uint8_t txBuff, Frame* oneMsg);
 
 void MCP2515Int(void);
 

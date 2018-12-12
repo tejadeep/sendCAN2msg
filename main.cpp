@@ -105,6 +105,8 @@ int main(int argc, char *argv[])
 
     if(myCAN->Init())
     {
+        caninte=myCAN->Read(CANINTE);
+
         if(DEBUG_CONFIG)
         {
             syslog(LOG_INFO,"CAN Init OK");
@@ -264,13 +266,14 @@ int main(int argc, char *argv[])
         {
             rx0BuffFull=0;
 
-            if(DEBUG_INMSG) logRecvMsg(0, &lire0);
+            if(DEBUG_INMSG)
+                logRecvMsg(0, &lire0);
 
             /**
              *  Put your stuff here
              *  For example :
              */
-            dispSingleMsg(0,&lire0);
+            dispSingleMsg(0, &lire0);
             /** End of your stuff **/
         }
 
@@ -278,13 +281,14 @@ int main(int argc, char *argv[])
         {
             rx1BuffFull=0;
 
-            if(DEBUG_INMSG) logRecvMsg(1, &lire1);
+            if(DEBUG_INMSG)
+                logRecvMsg(1, &lire1);
 
             /**
              *  Put your stuff here
              *  For example :
              */
-            dispSingleMsg(1,&lire1);
+            dispSingleMsg(1, &lire1);
             /** End of your stuff **/
         }
     }

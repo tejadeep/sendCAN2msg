@@ -276,9 +276,7 @@ bool MCP2515::Init()
         syslog(LOG_INFO,"BFPCTRL OK : 0x%x",Read(BFPCTRL));
     }
 
-    caninte=(_MERRE<<7) | (_WAKIE<<6) | (_ERRIE<<5) | (_TX2IE<<4) | (_TX1IE<<3) | (_TX0IE<<2) | (_RX1IE<<1) | _RX0IE;
-
-    if(!Write(CANINTE, caninte))
+    if(!Write(CANINTE, (_MERRE<<7) | (_WAKIE<<6) | (_ERRIE<<5) | (_TX2IE<<4) | (_TX1IE<<3) | (_TX0IE<<2) | (_RX1IE<<1) | _RX0IE))
     {
         syslog(LOG_ERR, "Writing CANINTE Fail");
         return false;
